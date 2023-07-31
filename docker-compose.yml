@@ -1,0 +1,137 @@
+#docker-compose up --build
+version: "3.8"
+
+services:
+  #MongoDB Container
+  ProductServiceDBMongo:
+    container_name: ProductServiceDBMongo
+    image: mongo:latest
+    restart: always
+    hostname: ProductServiceDBMongo
+    ports:
+      - "27017:27017"
+    networks:
+      - EcommerceNet
+  
+  #RedisDB Container 
+  EcommerceBasketServiceDBRedis:
+    container_name: EcommerceBasketServiceDBRedis
+    image: redis:latest
+    restart: always
+    hostname: EcommerceBasketServiceDBRedis
+    ports:
+      - "6379:6379"
+    networks:
+      - EcommerceNet
+  
+  #SqlDB Container
+  OrderServiceDBSqlServer:
+    container_name: EcommerceOrderServiceDBSqlServer
+    build: ./sqlData
+    restart: always
+    hostname: EcommerceOrderServiceDBSqlServer
+    image: sqldatabase
+    ports:
+      - "1433:1433"
+    networks:
+      - EcommerceNet
+    environment:
+      SA_PASSWORD: "abc123!!@"
+      ACCEPT_EULA: "Y"
+  
+  #Eurka Container
+  EurekaRegistry:
+    container_name: SEN300EurekaRegistry
+    image: steeltoeoss/eureka-server:latest
+    restart: always
+    hostname: SEN300EurekaRegistry
+    ports:
+      - "8761:8761"
+    networks:
+      - EcommerceNet
+  
+  #API Gatewat Container
+  EcommerceAPIGatewayOcelot:
+    container_name: EcommerceAPIGatewayOcelot
+    build:
+      context: ./dotnet-apigateway-ocelot
+      dockerfile: Dockerfile
+    image: ecommerceocelotgatewayapi:1
+    restart: always
+    hostname: EcommerceAPIGatewayOcelot
+    ports:
+      - "5041:80"
+    networks:
+      - EcommerceNet
+    depends_on:
+      - EurekaRegistry
+      - ProductServiceAPI
+      - BasketServiceAPI
+      - OrderServiceAPI
+  
+  #Prodcut API Container
+  ProductServiceAPI:
+    # container_name: ProductServiceAPI
+    build:
+      context: ./productservice
+      dockerfile: Dockerfile
+    image: ecommerceproductserviceapi:1
+    restart: always
+    hostname: ProductServiceAPI
+    ports:
+      - "8082:8080"
+    networks:
+      - EcommerceNet
+    depends_on:
+      - ProductServiceDBMongo
+      - EurekaRegistry
+      # - EcommerceAPIGatewayOcelot
+    # deploy:
+    #   mode: replicated
+    #   replicas: 3
+  
+  #Basket API Container
+  BasketServiceAPI:
+    # container_name: BasketServiceAPI
+    build:
+      context: ./basketservice
+      dockerfile: Dockerfile
+    image: ecommercebasketserviceapi:1
+    restart: always
+    hostname: BasketServiceAPI
+    ports:
+      - "8081:8080"
+    networks:
+      - EcommerceNet
+    depends_on:
+      - EcommerceBasketServiceDBRedis
+      - EurekaRegistry
+      # - EcommerceAPIGatewayOcelot
+    # deploy:
+    #   mode: replicated
+    #   replicas: 3
+
+  #Order API Container
+  OrderServiceAPI:
+    #container_name: OrderServiceAPI
+    build:
+      context: ./orderservice
+      dockerfile: Dockerfile
+    image: ecommerceorderserviceapi:1
+    restart: always
+    # hostname: OrderServiceAPI
+    ports:
+      - "8083:80"
+    networks:
+      - EcommerceNet
+    depends_on:
+      - OrderServiceDBSqlServer
+      - EurekaRegistry
+      # - EcommerceAPIGatewayOcelot
+    # deploy:
+    #   mode: replicated
+    #   replicas: 3
+
+networks:
+  EcommerceNet:
+    external: false
